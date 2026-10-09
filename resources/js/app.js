@@ -1,160 +1,253 @@
-
-import '../css/app.css';
-
 /*
 |--------------------------------------------------------------------------
-| PENSARIUM - INTERACCIONES GENERALES
+| PENSARIUM - JAVASCRIPT PRINCIPAL
+|--------------------------------------------------------------------------
+| Interacciones de la interfaz.
+| JavaScript puro, sin librerías externas.
 |--------------------------------------------------------------------------
 */
 
-document.addEventListener('DOMContentLoaded', () => {
-    inicializarTema();
-    inicializarMenu();
-    inicializarComentarios();
-    inicializarConfirmaciones();
-    inicializarContadores();
-    inicializarAlertas();
-});
+'use strict';
 
 /*
 |--------------------------------------------------------------------------
-| MODO CLARO / OSCURO
+| 1. ADMINISTRACIÓN DEL TEMA
 |--------------------------------------------------------------------------
 */
 
-function inicializarTema() {
-    const botones = document.querySelectorAll('[data-theme-toggle]');
-    const raiz = document.documentElement;
+const THEME_KEY = 'pensarium-theme';
 
-    const temaGuardado = localStorage.getItem('pensarium-theme');
-    const temaSistema = window.matchMedia(
+function getSavedTheme() {
+    try {
+        const saved = localStorage.getItem(THEME_KEY);
+
+        if (saved === 'light' || saved === 'dark') {
+            return saved;
+        }
+    } catch (error) {
+        // El navegador puede bloquear localStorage.
+    }
+
+    return window.matchMedia(
         '(prefers-color-scheme: dark)'
     ).matches ? 'dark' : 'light';
+}
 
-    aplicarTema(temaGuardado || temaSistema);
+function applyTheme(theme) {
+    const selectedTheme = theme === 'dark'
+        ? 'dark'
+        : 'light';
 
-    botones.forEach(boton => {
-        boton.addEventListener('click', () => {
-            const temaActual = raiz.getAttribute('data-theme');
+    document.documentElement.setAttribute(
+        'data-theme',
+        selectedTheme
+    );
 
-            const nuevoTema = temaActual === 'dark'
+    document.documentElement.style.colorScheme =
+        selectedTheme;
+
+    document.querySelectorAll(
+        '[data-theme-toggle]'
+    ).forEach(button => {
+
+        const isDark = selectedTheme === 'dark';
+
+        button.setAttribute(
+            'aria-label',
+            isDark
+                ? 'Activar modo claro'
+                : 'Activar modo oscuro'
+        );
+
+        button.setAttribute(
+            'title',
+            isDark
+                ? 'Modo claro'
+                : 'Modo oscuro'
+        );
+
+        button.setAttribute(
+            'aria-pressed',
+            String(isDark)
+        );
+
+        const sunIcon = button.querySelector(
+            '[data-icon-sun]'
+        );
+
+        const moonIcon = button.querySelector(
+            '[data-icon-moon]'
+        );
+
+        if (sunIcon) {
+            sunIcon.hidden = !isDark;
+        }
+
+        if (moonIcon) {
+            moonIcon.hidden = isDark;
+        }
+    });
+}
+
+function saveTheme(theme) {
+    try {
+        localStorage.setItem(THEME_KEY, theme);
+    } catch (error) {
+        // La interfaz seguirá funcionando.
+    }
+}
+
+function initializeTheme() {
+    applyTheme(getSavedTheme());
+
+    document.querySelectorAll(
+        '[data-theme-toggle]'
+    ).forEach(button => {
+
+        button.addEventListener('click', () => {
+
+            const currentTheme =
+                document.documentElement.getAttribute(
+                    'data-theme'
+                );
+
+            const newTheme = currentTheme === 'dark'
                 ? 'light'
                 : 'dark';
 
-            aplicarTema(nuevoTema);
-            localStorage.setItem('pensarium-theme', nuevoTema);
+            applyTheme(newTheme);
+            saveTheme(newTheme);
         });
-    });
-
-    function aplicarTema(tema) {
-        raiz.setAttribute('data-theme', tema);
-
-        botones.forEach(boton => {
-            boton.setAttribute(
-                'aria-label',
-                tema === 'dark'
-                    ? 'Activar modo claro'
-                    : 'Activar modo oscuro'
-            );
-
-            boton.setAttribute(
-                'title',
-                tema === 'dark'
-                    ? 'Modo claro'
-                    : 'Modo oscuro'
-            );
-        });
-    }
-}
-
-/*
-|--------------------------------------------------------------------------
-| MENÚ LATERAL RESPONSIVE
-|--------------------------------------------------------------------------
-*/
-
-function inicializarMenu() {
-    const boton = document.querySelector('[data-menu-toggle]');
-    const menu = document.querySelector('[data-sidebar]');
-    const fondo = document.querySelector('[data-sidebar-overlay]');
-
-    if (!boton || !menu) return;
-
-    function cerrarMenu() {
-        menu.classList.remove('is-open');
-        fondo?.classList.remove('is-visible');
-        boton.setAttribute('aria-expanded', 'false');
-        document.body.classList.remove('menu-open');
-    }
-
-    function abrirMenu() {
-        menu.classList.add('is-open');
-        fondo?.classList.add('is-visible');
-        boton.setAttribute('aria-expanded', 'true');
-        document.body.classList.add('menu-open');
-    }
-
-    boton.addEventListener('click', () => {
-        if (menu.classList.contains('is-open')) {
-            cerrarMenu();
-        } else {
-            abrirMenu();
-        }
-    });
-
-    fondo?.addEventListener('click', cerrarMenu);
-
-    document.addEventListener('keydown', evento => {
-        if (evento.key === 'Escape') {
-            cerrarMenu();
-        }
-    });
-
-    menu.querySelectorAll('a').forEach(enlace => {
-        enlace.addEventListener('click', cerrarMenu);
     });
 }
 
 /*
 |--------------------------------------------------------------------------
-| MOSTRAR / OCULTAR COMENTARIOS
+| 2. SIDEBAR RESPONSIVO
 |--------------------------------------------------------------------------
 */
 
-function inicializarComentarios() {
-    document.querySelectorAll('[data-comments-toggle]').forEach(boton => {
-        boton.addEventListener('click', () => {
-            const id = boton.dataset.commentsToggle;
-            const contenedor = document.getElementById(`comments-${id}`);
+function initializeSidebar() {
+    const menuButtons = document.querySelectorAll(
+        '[data-sidebar-toggle]'
+    );
 
-            if (!contenedor) return;
+    const overlay = document.querySelector(
+        '[data-sidebar-overlay]'
+    );
 
-            const estaOculto = contenedor.hidden;
+    const sidebar = document.querySelector(
+        '.app-sidebar'
+    );
 
-            contenedor.hidden = !estaOculto;
+    if (!sidebar) {
+        return;
+    }
 
-            boton.setAttribute(
+    function setSidebarState(isOpen) {
+        document.body.classList.toggle(
+            'sidebar-open',
+            isOpen
+        );
+
+        menuButtons.forEach(button => {
+            button.setAttribute(
                 'aria-expanded',
-                String(estaOculto)
+                String(isOpen)
             );
         });
+    }
+
+    menuButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const isOpen = document.body.classList.contains(
+                'sidebar-open'
+            );
+
+            setSidebarState(!isOpen);
+        });
+    });
+
+    if (overlay) {
+        overlay.addEventListener('click', () => {
+            setSidebarState(false);
+        });
+    }
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            setSidebarState(false);
+        }
+    });
+
+    sidebar.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+            setSidebarState(false);
+        });
+    });
+
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 850) {
+            setSidebarState(false);
+        }
     });
 }
 
 /*
 |--------------------------------------------------------------------------
-| CONFIRMACIÓN DE ELIMINACIÓN
+| 3. MOSTRAR Y OCULTAR CONTRASEÑAS
 |--------------------------------------------------------------------------
 */
 
-function inicializarConfirmaciones() {
-    document.querySelectorAll('[data-confirm]').forEach(formulario => {
-        formulario.addEventListener('submit', evento => {
-            const mensaje = formulario.dataset.confirm
-                || '¿Estás seguro de realizar esta acción?';
+function initializePasswordToggles() {
+    document.querySelectorAll(
+        '[data-password-toggle]'
+    ).forEach(button => {
 
-            if (!window.confirm(mensaje)) {
-                evento.preventDefault();
+        button.addEventListener('click', () => {
+
+            const inputId = button.getAttribute(
+                'data-password-toggle'
+            );
+
+            const input = document.getElementById(inputId);
+
+            if (!input) {
+                return;
+            }
+
+            const isPassword = input.type === 'password';
+
+            input.type = isPassword
+                ? 'text'
+                : 'password';
+
+            button.setAttribute(
+                'aria-label',
+                isPassword
+                    ? 'Ocultar contraseña'
+                    : 'Mostrar contraseña'
+            );
+
+            button.setAttribute(
+                'aria-pressed',
+                String(isPassword)
+            );
+
+            const eyeIcon = button.querySelector(
+                '[data-eye]'
+            );
+
+            const eyeOffIcon = button.querySelector(
+                '[data-eye-off]'
+            );
+
+            if (eyeIcon) {
+                eyeIcon.hidden = isPassword;
+            }
+
+            if (eyeOffIcon) {
+                eyeOffIcon.hidden = !isPassword;
             }
         });
     });
@@ -162,51 +255,196 @@ function inicializarConfirmaciones() {
 
 /*
 |--------------------------------------------------------------------------
-| CONTADOR DE CARACTERES
+| 4. CONTADOR DE CARACTERES
 |--------------------------------------------------------------------------
 */
 
-function inicializarContadores() {
-    document.querySelectorAll('[data-character-count]').forEach(campo => {
-        const identificador = campo.dataset.characterCount;
-        const contador = document.getElementById(identificador);
+function initializeCharacterCounters() {
+    document.querySelectorAll(
+        '[data-character-count]'
+    ).forEach(input => {
 
-        if (!contador) return;
+        const counterId = input.getAttribute(
+            'data-character-count'
+        );
 
-        const limite = Number(campo.getAttribute('maxlength')) || 0;
+        const counter = document.getElementById(counterId);
 
-        function actualizarContador() {
-            const cantidad = [...campo.value].length;
-
-            contador.textContent = limite > 0
-                ? `${cantidad} / ${limite}`
-                : `${cantidad} caracteres`;
-
-            contador.classList.toggle(
-                'is-limit',
-                limite > 0 && cantidad >= limite
-            );
+        if (!counter) {
+            return;
         }
 
-        campo.addEventListener('input', actualizarContador);
-        actualizarContador();
+        const maxLength = Number(
+            input.getAttribute('maxlength')
+        );
+
+        function updateCounter() {
+            const currentLength = Array.from(
+                input.value
+            ).length;
+
+            if (maxLength > 0) {
+                counter.textContent =
+                    `${currentLength} / ${maxLength}`;
+
+                counter.classList.toggle(
+                    'is-limit',
+                    currentLength >= maxLength
+                );
+            } else {
+                counter.textContent =
+                    `${currentLength} caracteres`;
+            }
+        }
+
+        input.addEventListener('input', updateCounter);
+
+        updateCounter();
     });
 }
 
 /*
 |--------------------------------------------------------------------------
-| CERRAR NOTIFICACIONES
+| 5. CONFIRMACIÓN DE ELIMINACIÓN
 |--------------------------------------------------------------------------
 */
 
-function inicializarAlertas() {
-    document.querySelectorAll('[data-alert-close]').forEach(boton => {
-        boton.addEventListener('click', () => {
-            const alerta = boton.closest('[data-alert]');
+function initializeDeleteConfirmations() {
+    document.querySelectorAll(
+        '[data-confirm-delete]'
+    ).forEach(form => {
 
-            if (alerta) {
-                alerta.remove();
+        form.addEventListener('submit', event => {
+
+            const message = form.getAttribute(
+                'data-confirm-delete'
+            ) || '¿Seguro que deseas eliminar este elemento?';
+
+            const confirmed = window.confirm(message);
+
+            if (!confirmed) {
+                event.preventDefault();
             }
         });
     });
+}
+
+/*
+|--------------------------------------------------------------------------
+| 6. CERRAR ALERTAS
+|--------------------------------------------------------------------------
+*/
+
+function initializeAlerts() {
+    document.querySelectorAll(
+        '[data-alert-close]'
+    ).forEach(button => {
+
+        button.addEventListener('click', () => {
+
+            const alert = button.closest('.alert');
+
+            if (alert) {
+                alert.remove();
+            }
+        });
+    });
+}
+
+/*
+|--------------------------------------------------------------------------
+| 7. PREVENIR ENVÍOS DUPLICADOS
+|--------------------------------------------------------------------------
+*/
+
+function initializeFormSubmissions() {
+    document.querySelectorAll(
+        'form[data-prevent-double-submit]'
+    ).forEach(form => {
+
+        let submitting = false;
+
+        form.addEventListener('submit', event => {
+
+            if (event.defaultPrevented) {
+                return;
+            }
+
+            if (!form.checkValidity()) {
+                return;
+            }
+
+            if (submitting) {
+                event.preventDefault();
+                return;
+            }
+
+            submitting = true;
+
+            const submitButton = form.querySelector(
+                'button[type="submit"]'
+            );
+
+            if (submitButton) {
+                submitButton.setAttribute(
+                    'aria-disabled',
+                    'true'
+                );
+
+                submitButton.classList.add(
+                    'is-submitting'
+                );
+            }
+        });
+    });
+}
+
+/*
+|--------------------------------------------------------------------------
+| 8. AUTOAJUSTAR TEXTAREAS
+|--------------------------------------------------------------------------
+*/
+
+function initializeAutoResize() {
+    document.querySelectorAll(
+        'textarea[data-auto-resize]'
+    ).forEach(textarea => {
+
+        function resize() {
+            textarea.style.height = 'auto';
+
+            textarea.style.height =
+                `${textarea.scrollHeight}px`;
+        }
+
+        textarea.addEventListener('input', resize);
+
+        resize();
+    });
+}
+
+/*
+|--------------------------------------------------------------------------
+| 9. INICIALIZAR LA APLICACIÓN
+|--------------------------------------------------------------------------
+*/
+
+function initializePensarium() {
+    initializeTheme();
+    initializeSidebar();
+    initializePasswordToggles();
+    initializeCharacterCounters();
+    initializeDeleteConfirmations();
+    initializeAlerts();
+    initializeFormSubmissions();
+    initializeAutoResize();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener(
+        'DOMContentLoaded',
+        initializePensarium
+    );
+} else {
+    initializePensarium();
 }

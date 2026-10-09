@@ -1,37 +1,48 @@
-
 <?php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Comentario extends Model
 {
-    protected $table = 'comentarios';
-    protected $primaryKey = 'id_comentario';
+    use HasFactory;
 
+    /**
+     * Tabla asociada.
+     */
+    protected $table = 'comentarios';
+
+    /**
+     * Campos asignables.
+     */
     protected $fillable = [
-        'id_publicacion',
-        'id_usuario',
+        'user_id',
+        'publicacion_id',
         'contenido',
     ];
 
+    /**
+     * Usuario que escribió el comentario.
+     */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(
-            Usuario::class,
-            'id_usuario',
-            'id_usuario'
+            User::class,
+            'user_id'
         );
     }
 
+    /**
+     * Publicación a la que pertenece.
+     */
     public function publicacion(): BelongsTo
     {
         return $this->belongsTo(
             Publicacion::class,
-            'id_publicacion',
-            'id_publicacion'
+            'publicacion_id'
         );
     }
 }

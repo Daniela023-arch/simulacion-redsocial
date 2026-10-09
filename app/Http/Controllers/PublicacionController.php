@@ -5,105 +5,109 @@ namespace App\Http\Controllers;
 use App\Models\Publicacion;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Auth;
 
 class PublicacionController extends Controller
 {
+    /**
+     * Mostrar formulario para crear publicación.
+     */
     public function crear(): View
     {
         return view('publicaciones.crear');
     }
 
+    /**
+     * Guardar una nueva publicación.
+     */
     public function guardar(Request $request): RedirectResponse
     {
         $datos = $request->validate([
             'contenido' => [
                 'required',
                 'string',
-                'min:1',
-                'max:5000'
+                'max:5000',
             ],
         ]);
 
         Publicacion::create([
-            'id_usuario' => Auth::id(),
+            'user_id' => Auth::id(),
             'contenido' => $datos['contenido'],
         ]);
 
         return redirect()
             ->route('inicio')
-            ->with('success', 'Publicación creada correctamente.');
+            ->with('success', 'Tu publicación se compartió correctamente.');
     }
 
-    public function mostrar(Publicacion $publicacion): View
-    {
-        $publicacion->load([
-            'usuario',
-            'comentarios' => function ($query) {
-                $query->with('usuario')
-                    ->orderBy('created_at')
-                    ->orderBy('id_comentario');
-            },
-        ]);
-
-        return view(
-            'publicaciones.mostrar',
-            compact('publicacion')
-        );
-    }
-
+    /**
+     * Mostrar formulario para editar una publicación.
+     */
     public function editar(Publicacion $publicacion): View
     {
-        abort_unless(
-            $publicacion->id_usuario === Auth::id(),
-            403,
-            'No puedes editar esta publicación.'
-        );
+        $this->verificarPropietario($publicacion);
 
-        return view(
-            'publicaciones.editar',
-            compact('publicacion')
-        );
+        return view('publicaciones.editar', compact(
+            'publicacion'
+        ));
     }
 
+    /**
+     * Actualizar una publicación existente.
+     */
     public function actualizar(
         Request $request,
         Publicacion $publicacion
     ): RedirectResponse {
-        abort_unless(
-            $publicacion->id_usuario === Auth::id(),
-            403
-        );
+
+        $this->verificarPropietario($publicacion);
 
         $datos = $request->validate([
             'contenido' => [
                 'required',
                 'string',
-                'min:1',
-                'max:5000'
+                'max:5000',
             ],
         ]);
 
-        $publicacion->update($datos);
+        $publicacion->update([
+            'contenido' => $datos['contenido'],
+        ]);
 
         return redirect()
-            ->route('publicaciones.mostrar', $publicacion)
-            ->with('success', 'Publicación actualizada.');
+            ->route('inicio')
+            ->with('success', 'Publicación actualizada correctamente.');
     }
 
+    /**
+     * Eliminar una publicación.
+     */
     public function eliminar(
         Publicacion $publicacion
     ): RedirectResponse {
-        abort_unless(
-            $publicacion->id_usuario === Auth::id(),
-            403
-        );
+
+        $this->verificarPropietario($publicacion);
 
         $publicacion->delete();
 
         return redirect()
             ->route('inicio')
-            ->with('success', 'Publicación eliminada.');
+            ->with('success', 'Publicación eliminada correctamente.');
+    }
+
+    /**
+     * Verificar que la publicación pertenezca
+     * al usuario autenticado.
+     */
+    private function verificarPropietario(
+        Publicacion $publicacion
+    ): void {
+
+        abort_unless(
+            $publicacion->user_id === Auth::id(),
+            403,
+            'No tienes permiso para modificar esta publicación.'
+        );
     }
 }

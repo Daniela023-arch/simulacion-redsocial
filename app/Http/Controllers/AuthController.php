@@ -1,58 +1,82 @@
-
 <?php
 
 namespace App\Http\Controllers;
 
-use App\Models\Usuario;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 class AuthController extends Controller
 {
+    /**
+     * Mostrar formulario de inicio de sesión.
+     */
     public function mostrarLogin(): View
     {
         return view('auth.login');
     }
 
+    /**
+     * Mostrar formulario de registro.
+     */
     public function mostrarRegistro(): View
     {
         return view('auth.registro');
     }
 
-    public function registrar(Request $request): RedirectResponse
+    /**
+     * Registrar un nuevo usuario.
+     */
+    public function registro(Request $request): RedirectResponse
     {
         $datos = $request->validate([
-            'nombre' => ['required', 'string', 'max:100'],
-            'nombre_usuario' => [
+            'nombre' => [
                 'required',
                 'string',
-                'alpha_dash',
-                'max:50',
-                'unique:usuarios,nombre_usuario'
+                'max:100',
             ],
-            'correo' => [
+
+            'username' => [
+                'required',
+                'string',
+                'min:3',
+                'max:50',
+                'alpha_dash:ascii',
+                'unique:users,username',
+            ],
+
+            'email' => [
                 'required',
                 'email',
-                'max:150',
-                'unique:usuarios,correo'
+                'max:255',
+                'unique:users,email',
             ],
+
             'password' => [
                 'required',
                 'confirmed',
-                Password::min(8)
+                Password::min(8),
             ],
         ]);
 
-        $usuario = Usuario::create([
-            'nombre' => $datos['nombre'],
-            'nombre_usuario' => $datos['nombre_usuario'],
-            'correo' => $datos['correo'],
-            'password' => $datos['password'],
-            'avatar_color' => '#8e6e53',
-        ]);
+        try {
+            $usuario = User::create([
+                'nombre' => $datos['nombre'],
+                'username' => $datos['username'],
+                'email' => $datos['email'],
+                'password' => Hash::make($datos['password']),
+            ]);
+        } catch (UniqueConstraintViolationException $e) {
+            throw ValidationException::withMessages([
+                'email' => 'El correo o nombre de usuario ya está registrado.',
+            ]);
+        }
 
         Auth::login($usuario);
 
@@ -60,22 +84,42 @@ class AuthController extends Controller
 
         return redirect()
             ->route('inicio')
-            ->with('success', 'Tu cuenta fue creada correctamente.');
+            ->with('success', 'Tu cuenta se creó correctamente.');
     }
 
-    public function iniciarSesion(Request $request): RedirectResponse
+    /**
+     * Iniciar sesión con correo o nombre de usuario.
+     */
+    public function login(Request $request): RedirectResponse
     {
-        $credenciales = $request->validate([
-            'correo' => ['required', 'email'],
-            'password' => ['required', 'string'],
+        $datos = $request->validate([
+            'identificador' => [
+                'required',
+                'string',
+            ],
+
+            'password' => [
+                'required',
+                'string',
+            ],
         ]);
 
-        if (!Auth::attempt($credenciales, $request->boolean('recordar'))) {
-            return back()
-                ->withErrors([
-                    'correo' => 'El correo o la contraseña son incorrectos.',
-                ])
-                ->onlyInput('correo');
+        $identificador = trim($datos['identificador']);
+
+        $campo = filter_var(
+            $identificador,
+            FILTER_VALIDATE_EMAIL
+        ) ? 'email' : 'username';
+
+        $credenciales = [
+            $campo => $identificador,
+            'password' => $datos['password'],
+        ];
+
+        if (!Auth::attempt($credenciales)) {
+            throw ValidationException::withMessages([
+                'identificador' => 'El usuario, correo o contraseña son incorrectos.',
+            ]);
         }
 
         $request->session()->regenerate();
@@ -83,13 +127,19 @@ class AuthController extends Controller
         return redirect()->intended(route('inicio'));
     }
 
-    public function cerrarSesion(Request $request): RedirectResponse
+    /**
+     * Cerrar sesión de forma segura.
+     */
+    public function logout(Request $request): RedirectResponse
     {
         Auth::logout();
 
         $request->session()->invalidate();
+
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        return redirect()
+            ->route('login')
+            ->with('success', 'Has cerrado sesión correctamente.');
     }
 }

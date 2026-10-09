@@ -1,7 +1,7 @@
-
 <?php
 
 use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\PublicacionController;
@@ -12,68 +12,146 @@ use App\Http\Controllers\PerfilController;
 |--------------------------------------------------------------------------
 | PENSARIUM - RUTAS WEB
 |--------------------------------------------------------------------------
+| Sistema de publicación de pensamientos y comentarios.
+|--------------------------------------------------------------------------
 */
 
-// Usuarios que todavía no han iniciado sesión
-Route::middleware('guest')->group(function () {
+// Página inicial
+Route::get('/', function () {
+    return redirect()->route(
+        auth()->check() ? 'inicio' : 'login'
+    );
+})->name('principal');
 
-    Route::get('/login', [AuthController::class, 'mostrarLogin'])
-        ->name('login');
+/*
+|--------------------------------------------------------------------------
+| RUTAS PARA INVITADOS
+|--------------------------------------------------------------------------
+| Solo usuarios que no han iniciado sesión.
+|--------------------------------------------------------------------------
+*/
 
-    Route::post('/login', [AuthController::class, 'login'])
-        ->name('login.procesar');
+Route::middleware('invitado')->group(function () {
 
-    Route::get('/registro', [AuthController::class, 'mostrarRegistro'])
-        ->name('registro');
+    // Inicio de sesión
+    Route::get('/login', [
+        AuthController::class,
+        'mostrarLogin'
+    ])->name('login');
 
-    Route::post('/registro', [AuthController::class, 'registro'])
-        ->name('registro.procesar');
+    Route::post('/login', [
+        AuthController::class,
+        'login'
+    ])->name('login.procesar');
+
+    // Registro
+    Route::get('/registro', [
+        AuthController::class,
+        'mostrarRegistro'
+    ])->name('registro');
+
+    Route::post('/registro', [
+        AuthController::class,
+        'registro'
+    ])->name('registro.guardar');
+
 });
 
-// Usuarios autenticados
-Route::middleware('auth')->group(function () {
+/*
+|--------------------------------------------------------------------------
+| RUTAS PARA USUARIOS AUTENTICADOS
+|--------------------------------------------------------------------------
+*/
 
-    // Página principal
-    Route::get('/', [InicioController::class, 'index'])
-        ->name('inicio');
+Route::middleware('autenticado')->group(function () {
 
     // Cerrar sesión
-    Route::post('/logout', [AuthController::class, 'logout'])
-        ->name('logout');
+    Route::post('/logout', [
+        AuthController::class,
+        'logout'
+    ])->name('logout');
 
-    // Publicaciones
-    Route::post('/publicaciones', [PublicacionController::class, 'store'])
-        ->name('publicaciones.store');
+    /*
+    |--------------------------------------------------------------------------
+    | INICIO
+    |--------------------------------------------------------------------------
+    */
 
-    Route::get('/publicaciones/{publicacion}/editar', [PublicacionController::class, 'edit'])
-        ->name('publicaciones.edit');
+    Route::get('/inicio', [
+        InicioController::class,
+        'index'
+    ])->name('inicio');
 
-    Route::put('/publicaciones/{publicacion}', [PublicacionController::class, 'update'])
-        ->name('publicaciones.update');
+    /*
+    |--------------------------------------------------------------------------
+    | PUBLICACIONES
+    |--------------------------------------------------------------------------
+    */
 
-    Route::delete('/publicaciones/{publicacion}', [PublicacionController::class, 'destroy'])
-        ->name('publicaciones.destroy');
+    // Formulario de nueva publicación
+    Route::get('/publicaciones/crear', [
+        PublicacionController::class,
+        'crear'
+    ])->name('publicaciones.crear');
 
-    // Comentarios
-    Route::post('/publicaciones/{publicacion}/comentarios', [ComentarioController::class, 'store'])
-        ->name('comentarios.store');
+    // Guardar publicación
+    Route::post('/publicaciones', [
+        PublicacionController::class,
+        'guardar'
+    ])->name('publicaciones.guardar');
 
-    Route::delete('/comentarios/{comentario}', [ComentarioController::class, 'destroy'])
-        ->name('comentarios.destroy');
+    // Formulario de edición
+    Route::get('/publicaciones/{publicacion}/editar', [
+        PublicacionController::class,
+        'editar'
+    ])->name('publicaciones.editar');
 
-    // Perfiles
-    Route::get('/usuarios', [PerfilController::class, 'buscar'])
-        ->name('usuarios.buscar');
+    // Actualizar publicación
+    Route::put('/publicaciones/{publicacion}', [
+        PublicacionController::class,
+        'actualizar'
+    ])->name('publicaciones.actualizar');
 
-    Route::get('/perfil/editar', [PerfilController::class, 'edit'])
-        ->name('perfil.edit');
+    // Eliminar publicación
+    Route::delete('/publicaciones/{publicacion}', [
+        PublicacionController::class,
+        'eliminar'
+    ])->name('publicaciones.eliminar');
 
-    Route::put('/perfil', [PerfilController::class, 'update'])
-        ->name('perfil.update');
+    /*
+    |--------------------------------------------------------------------------
+    | COMENTARIOS
+    |--------------------------------------------------------------------------
+    */
 
-    Route::put('/perfil/password', [PerfilController::class, 'updatePassword'])
-        ->name('perfil.password');
+    // Ver comentarios de una publicación
+    Route::get('/publicaciones/{publicacion}/comentarios', [
+        ComentarioController::class,
+        'index'
+    ])->name('comentarios.index');
 
-    Route::get('/perfil/{usuario}', [PerfilController::class, 'show'])
-        ->name('perfil.show');
+    // Guardar comentario
+    Route::post('/publicaciones/{publicacion}/comentarios', [
+        ComentarioController::class,
+        'guardar'
+    ])->name('comentarios.guardar');
+
+    // Eliminar comentario
+    Route::delete('/comentarios/{comentario}', [
+        ComentarioController::class,
+        'eliminar'
+    ])->name('comentarios.eliminar');
+
+    /*
+    |--------------------------------------------------------------------------
+    | PERFILES
+    |--------------------------------------------------------------------------
+    */
+
+    // Ver perfil de cualquier usuario
+    Route::get('/perfiles/{usuario}', [
+        PerfilController::class,
+        'mostrar'
+    ])->name('perfiles.mostrar');
+
 });

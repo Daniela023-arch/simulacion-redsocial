@@ -1,37 +1,48 @@
-
 <?php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Publicacion extends Model
 {
-    protected $table = 'publicaciones';
-    protected $primaryKey = 'id_publicacion';
+    use HasFactory;
 
+    /**
+     * Tabla asociada.
+     */
+    protected $table = 'publicaciones';
+
+    /**
+     * Campos asignables.
+     */
     protected $fillable = [
-        'id_usuario',
+        'user_id',
         'contenido',
     ];
 
+    /**
+     * Usuario propietario de la publicaciÃ³n.
+     */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(
-            Usuario::class,
-            'id_usuario',
-            'id_usuario'
+            User::class,
+            'user_id'
         );
     }
 
+    /**
+     * Comentarios de la publicaciÃ³n.
+     */
     public function comentarios(): HasMany
     {
         return $this->hasMany(
             Comentario::class,
-            'id_publicacion',
-            'id_publicacion'
+            'publicacion_id'
         );
     }
 }
